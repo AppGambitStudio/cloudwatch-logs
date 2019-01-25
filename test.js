@@ -1,4 +1,4 @@
-const cloudWatch = require('./lib/cloudwatch');
+const cloudWatch = require('./cloudwatch');
 
 const accessKeyId = process.env.ACCESS_KEY;
 const secretAccessKey = process.env.SECRET_KEY;
