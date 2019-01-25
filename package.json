@@ -1,0 +1,16 @@
+{
+  "name": "cloudwatch-logs",
+  "version": "1.0.0",
+  "description": "Minimalist library for cloudwatch logs",
+  "main": "cloudwatch.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Dhaval Nagar",
+  "license": "ISC",
+  "dependencies": {
+    "aws-sdk": "^2.388.0",
+    "moment": "^2.24.0"
+  }
+}
