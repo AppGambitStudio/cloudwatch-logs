@@ -1,5 +1,6 @@
 const AWS = require('aws-sdk');
 const moment = require('moment');
+const interval = require('interval-promise')
 
 let sequenceToken;
 let cloudwatchlogs;
@@ -9,30 +10,33 @@ let includeLocalDateTime = false;
 let initDone = false;
 let pendingMessages = [];
 
-const maxMessages = 1000;
+const maxMessages = 10;
 
-const _logStream = (logGroup, logStream) => {
+const _logStream =  (logGroup, logStream) => {
     return new Promise(function(resolve, reject) {
         var params = {
             logGroupName: logGroup,
             limit: 50,
             logStreamNamePrefix: logStream            
         };
-        cloudwatchlogs.describeLogStreams(params, function(err, data) {
+
+        cloudwatchlogs.describeLogStreams(params,function(err, data) {
             if (err) {
                 reject(err);
             }else{
                 const streams = data.logStreams.filter( (grp) => grp.logStreamName == logStream);
-                // console.log(streams);
+                  //console.log(streams[0].uploadSequenceToken);
                 if(streams.length > 0){
-                    sequenceToken = streams[0].uploadSequenceToken                    
+                    console.log(streams[0].uploadSequenceToken);
+                    sequenceToken = streams[0].uploadSequenceToken             
                     resolve(streams[0]);
                 }else{
+                    console.log("create log");
                     var params = {
                         logGroupName: logGroup,
                         logStreamName: logStream
-                    };
-
+                 };
+                    console.log(params);
                     cloudwatchlogs.createLogStream(params, (err, data) => {
                         if (err) reject(err);
                         else resolve(data);
@@ -51,10 +55,9 @@ const _sendLog = (message, cb) => {
     if(includeLocalDateTime){
         logMessage = `[SERVER TIME:${moment().format('DD/MM/YYYY HH:mm:ss')}] ${logMessage}`;
     }
-    
-    return _logStream(appName, logStream)
-    .then(() => {
-        var params = {
+     return _logStream(appName, logStream)
+    .then( async () => {
+        var params ={
             logEvents: [{
                 message: logMessage,
                 timestamp: new Date().getTime()
@@ -63,19 +66,23 @@ const _sendLog = (message, cb) => {
             logStreamName: logStream,
             sequenceToken: sequenceToken
         };
-
-        cloudwatchlogs.putLogEvents(params, function(err, data) {
-            if (err) {
-                if(cb){
-                    return cb(err);
-                }else{
-                    console.log(err);
-                }
-            }else{
-                sequenceToken = data.nextSequenceToken;                
-            }
-        });
-    })    
+            if(pendingMessages.length > 0){
+                interval(async () => {
+                    await pendingMessages.pop();
+                    await cloudwatchlogs.putLogEvents(params,async function(err, data) {
+                        if (err) {
+                            if(cb){
+                                return cb(err);
+                            }else{
+                                console.log(err);
+                            }
+                        }else{   
+                            sequenceToken = await data.nextSequenceToken;         
+                        }
+                    })      
+                },2000,{iterations:pendingMessages.length});
+            }    
+        })
 };
 
 module.exports = {
@@ -102,7 +109,7 @@ module.exports = {
                     reject(err);
                 }else{
                     const groups = data.logGroups.filter( (grp) => grp.logGroupName == appName);
-                    // console.log(groups);
+                     console.log(groups);
                     if(groups.length > 0){
                         initDone = true;
                         resolve(groups[0]);
@@ -122,13 +129,13 @@ module.exports = {
             });            
         });                
     },
-
     putLog: (message, cb) => {
-        if(!initDone || pendingMessages.length > 0){
+        if(initDone && pendingMessages.length == 0)
+        {
             pendingMessages.push(message);
-            return;
-        }
-
-        return _sendLog(message, cb); 
+            console.log(pendingMessages);
+            return _sendLog(message, cb);    
+        } 
+        else return;      
     }
 };

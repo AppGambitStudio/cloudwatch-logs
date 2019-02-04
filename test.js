@@ -1,9 +1,11 @@
 const cloudWatch = require('./cloudwatch');
+const interval = require('interval-promise')
 
 const accessKeyId = process.env.ACCESS_KEY;
 const secretAccessKey = process.env.SECRET_KEY;
 const region = process.env.region;
 const appName = process.env.APP_NAME;
+
 
 cloudWatch.init({
     region,
@@ -13,9 +15,9 @@ cloudWatch.init({
     includeLocalDateTime: true
 })
 .then(() => {
-    setInterval( () => {
-        cloudWatch.putLog({
+    setInterval(async () => {
+        await cloudWatch.putLog({
             logMessage: 'test message'
         });
-    }, 1000);    
+    }, 500);  
 });
