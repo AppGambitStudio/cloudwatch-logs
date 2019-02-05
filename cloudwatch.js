@@ -25,8 +25,10 @@ const _logStream = (logGroup, logStream) => {
             }else{
                 const streams = data.logStreams.filter( (grp) => grp.logStreamName == logStream);
                 // console.log(streams);
+
                 if(streams.length > 0){
                     console.log(streams[0].uploadSequenceToken);
+
                     sequenceToken = streams[0].uploadSequenceToken                    
                     resolve(streams[0]);
                 }else{
@@ -34,7 +36,6 @@ const _logStream = (logGroup, logStream) => {
                         logGroupName: logGroup,
                         logStreamName: logStream
                     };
-
                     cloudwatchlogs.createLogStream(params, (err, data) => {
                         if (err) reject(err);
                         else resolve(data);
@@ -66,20 +67,26 @@ const _sendLog = (message, cb) => {
             sequenceToken: sequenceToken
         };
         if(pendingMessages.length > 0){
-            interval(async () => {
-                await pendingMessages.pop();
-                await cloudwatchlogs.putLogEvents(params, function(err, data) {
-                    if (err) {
-                        if(cb){
-                            return cb(err);
+            interval(() => {
+                return new Promise((resolve,reject) => {
+                    cloudwatchlogs.putLogEvents(params, function(err, data) {
+                        if (err) {
+                            if(cb){
+                                return cb(err);
+                            }else{
+                                reject(err);
+                            }
                         }else{
-                            console.log(err);
+                            resolve(data);              
                         }
-                    }else{
-                        sequenceToken = data.nextSequenceToken;                
-                    }
-                });
-            },1500,{iterations: pendingMessages.length});
+                    });
+                }).then((data) => {
+                    pendingMessages.pop();
+                    sequenceToken = data.nextSequenceToken;  
+                }).catch((err) => {
+                    console.log(err);
+                })
+            },1000,{iterations: pendingMessages.length});
         }   
     })    
 };
@@ -108,7 +115,7 @@ module.exports = {
                     reject(err);
                 }else{
                     const groups = data.logGroups.filter( (grp) => grp.logGroupName == appName);
-                     console.log(groups);
+                    // console.log(groups);
                     if(groups.length > 0){
                         initDone = true;
                         resolve(groups[0]);
